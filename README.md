@@ -119,29 +119,122 @@ export SLACK_LIST_ID="F0123456789"
 ## Usage
 
 ```bash
-# View the Kanban board in the terminal
+# View the Kanban board in the terminal (shows assignees & comment counts)
 uv run slist board
 
 # Inspect the list's columns, IDs, types, and valid select options
 uv run slist schema
 
 # Add a new card
-uv run slist add "Implement OAuth flow" --status "To Do" --field "Priority=High"
+uv run slist add "Implement OAuth flow" --status "To Do" --field "Priority=2"
 
 # Move a card to another Kanban lane (using #index from `slist board` or Rec... ID)
 uv run slist move 1 "In Progress"
 
-# Show full details for a card
+# Show full details and comment thread for a card
 uv run slist show 1
 
 # Edit card fields
-uv run slist edit 1 --title "Implement OAuth 2.0 flow" --field "Due Date=2026-12-01"
+uv run slist edit 1 --title "Implement OAuth 2.0 flow" --field "Due date=2026-12-01"
 
 # Delete a card
 uv run slist rm 1
 ```
 
-You can also pass `--list-id F0...`, `--env-file path/to/.env`, `--json`, or `--yaml` to any command.
+You can pass `--list-id F0...`, `--env-file path/to/.env`, `--json`, or `--yaml` to any command. When using `--json` or `--yaml`, both `slist board` and `slist show` include full comment threads alongside each item's fields.
+
+---
+
+## Using as an Antigravity (`agy`) Agent
+
+You can wrap `slist` in a custom [Antigravity (`agy`)](https://antigravity.google) agent so you can ask it to check your board, report tasks assigned to you, surface blocked items/comments, or update cards.
+
+### 1. Install `slist` globally & configure global credentials
+
+```bash
+# Install `slist` on your PATH as an editable uv tool
+uv tool install --editable .
+
+# Store your credentials in the global fallback location
+mkdir -p ~/.config/slack-lists
+cp .env ~/.config/slack-lists/.env
+chmod 600 ~/.config/slack-lists/.env
+```
+
+### 2. Create the `agy` agent definition
+
+Save the following file to `~/.gemini/config/agents/slack-kanban.md` (replace `@your-handle` / `Your Name` with your Slack identity):
+
+````markdown
+---
+name: slack-kanban
+description: >-
+  Checks and manages your Slack Lists Kanban board (project tracker) using the `slist` CLI.
+  Finds tasks assigned to you, surfaces blocked items and comments, and adds, moves, or updates cards.
+tools:
+  - run_command
+mainAgent: true
+---
+
+# Slack Kanban Board Agent
+
+You are a dedicated assistant for managing the user's Slack Lists Kanban board using the globally
+installed `slist` CLI. Credentials and default `SLACK_LIST_ID` are loaded automatically from
+environment variables, a local `.env`, or `~/.config/slack-lists/.env`.
+
+## User Identity
+- The user's Slack identity is **Your Name** (`@your-handle` — match case-insensitively on the
+  `Assignee` field).
+
+## Reading the Board
+Always prefer `--json` (or `--yaml`) when inspecting data so you get structured fields, assignees,
+and full comment threads:
+
+```bash
+slist board --json
+slist show <index-or-RecID> --json
+slist schema --json
+```
+
+## Reporting Status
+When asked to check the board, check assignments, or give a status update:
+1. Run `slist board --json`.
+2. **Assigned to you:** Highlight all cards where `Assignee` matches your handle, grouped by `Status`,
+   showing `#index`, `Task`, `Priority`, `Due date`, and any `comments`.
+3. **Blocked / Recent comments:** Call out any cards in `Blocked` or cards with `comments`.
+4. **Unassigned:** Briefly note unassigned cards in `Not started` / `In progress` if relevant.
+
+## Updating the Board
+Only mutate the board when explicitly asked:
+
+```bash
+slist add "Task title" --status "Not started" --field "Priority=2" --field "Description=Details" --json
+slist move <index-or-RecID> "In progress" --json
+slist edit <index-or-RecID> --field "Assignee=@your-handle" --field "Due date=2026-12-01" --json
+slist rm <index-or-RecID> --yes --json
+```
+
+## Safety Rules
+- Always confirm with the user before deleting a card (`slist rm`).
+- Never print or expose `.env` contents or `SLACK_TOKEN`.
+````
+
+> **Tip:** To share an agent with a team inside a repo instead of globally, place it at `.agents/agents/slack-kanban.md`.
+
+### 3. Verify & Run
+
+```bash
+# Confirm agy discovers the agent
+agy agents
+
+# Launch an interactive session with the agent
+agy --agent slack-kanban
+
+# Or run a one-shot check from your terminal (or cron)
+agy --agent slack-kanban -p "Check my board — have I been assigned anything?"
+```
+
+You can also switch to it inside any `agy` TUI session by running `/agents` and selecting `slack-kanban`.
 
 ---
 
