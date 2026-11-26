@@ -6,7 +6,30 @@ from pathlib import Path
 
 import pytest
 
+from slack_lists import config
 from slack_lists.config import load_settings
+
+
+def test_global_env_fallback_and_local_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("SLACK_TOKEN", raising=False)
+    monkeypatch.delenv("SLACK_LIST_ID", raising=False)
+
+    global_env = tmp_path / "global.env"
+    global_env.write_text(
+        "SLACK_TOKEN=xoxp-global\nSLACK_LIST_ID=F0GLOBAL\n",
+        encoding="utf-8",
+    )
+    local_dir = tmp_path / "work"
+    local_dir.mkdir()
+    (local_dir / ".env").write_text("SLACK_LIST_ID=F0LOCAL\n", encoding="utf-8")
+
+    monkeypatch.chdir(local_dir)
+    monkeypatch.setattr(config, "GLOBAL_ENV_FILE", global_env)
+    settings = config.Settings(_env_file=(global_env, Path(".env")))  # type: ignore[call-arg]
+    assert settings.require_token() == "xoxp-global"
+    assert settings.require_list_id() == "F0LOCAL"
 
 
 def test_loads_from_dotenv_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

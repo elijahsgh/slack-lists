@@ -87,9 +87,12 @@ Slack Lists are backed by Slack's file model, so every list has a File ID starti
 
 ## Configuration
 
-Settings are managed via `pydantic-settings`. Environment variables take precedence over values in `.env`.
+Settings are managed via `pydantic-settings` with the following precedence (highest to lowest):
+1. Environment variables (`SLACK_TOKEN`, `SLACK_LIST_ID`, `SLACK_STATUS_COLUMN`)
+2. Local `.env` in the current working directory
+3. Global `~/.config/slack-lists/.env`
 
-Copy `.env.example` to `.env` and fill in your values:
+Copy `.env.example` to `.env` (or `~/.config/slack-lists/.env` for global use) and fill in your values:
 
 ```bash
 cp .env.example .env

@@ -7,15 +7,20 @@ from pathlib import Path
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+GLOBAL_ENV_FILE = Path.home() / ".config" / "slack-lists" / ".env"
+
 
 class Settings(BaseSettings):
     """Configuration for slack-lists.
 
-    Environment variables always take precedence over values in `.env`.
+    Precedence (highest to lowest):
+    1. Environment variables
+    2. Local `.env` in current working directory
+    3. Global `~/.config/slack-lists/.env`
     """
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(GLOBAL_ENV_FILE, ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
